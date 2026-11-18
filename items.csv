@@ -1,0 +1,47 @@
+ID,Name,Type,Condition,Amount
+1,Hummer,Tool,Mint,10
+1,Hummer,Tool,Good,6
+1,Hummer,Tool,Bad,2
+2,Nails,Fasteners,Good,450
+2,Nails,Fasteners,Bad,100
+3,Canned Beans,Food,Mint,60
+3,Canned Beans,Food,Good,80
+3,Canned Beans,Food,Average,25
+4,Bottled Water,Drink,Mint,120
+4,Bottled Water,Drink,Good,90
+4,Bottled Water,Drink,Bad,15
+5,Bandages,Medical,Mint,40
+5,Bandages,Medical,Good,55
+5,Bandages,Medical,Average,20
+6,Antibiotics,Medical,Mint,12
+6,Antibiotics,Medical,Average,8
+7,Axe,Weapon,Good,5
+7,Axe,Weapon,Average,3
+8,Baseball Bat,Weapon,Good,7
+8,Baseball Bat,Weapon,Bad,4
+9,Rope,Tool,Good,30
+9,Rope,Tool,Average,18
+10,Flashlight,Tool,Mint,6
+10,Flashlight,Tool,Average,9
+10,Flashlight,Tool,Bad,5
+11,Batteries,Electronics,Good,200
+11,Batteries,Electronics,Bad,60
+12,Rice,Food,Mint,50
+12,Rice,Food,Good,70
+13,Matches,Fire,Good,150
+13,Matches,Fire,Bad,40
+14,Gasoline,Fuel,Good,35
+14,Gasoline,Fuel,Average,20
+15,Sleeping Bag,Gear,Good,8
+15,Sleeping Bag,Gear,Average,5
+16,Duct Tape,Tool,Mint,14
+16,Duct Tape,Tool,Good,22
+17,Raincoat,Clothing,Good,10
+17,Raincoat,Clothing,Bad,6
+18,Boots,Clothing,Mint,4
+18,Boots,Clothing,Good,9
+18,Boots,Clothing,Average,7
+19,Radio,Electronics,Good,3
+19,Radio,Electronics,Bad,2
+20,Water Filter,Gear,Mint,5
+20,Water Filter,Gear,Good,3

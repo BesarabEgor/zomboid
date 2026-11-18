@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zomboid Accounting System</title>
+    <style>
+:root {
+  --bg: #12150f; --card: #1c2117; --line: #2c3424; --text: #e4e9dc; --muted: #8d9882;
+  --accent: #7fb03a; --mint: #5fd08a; --good: #8fc24a; --average: #e0b43c; --bad: #d95f4b; --other: #7a8ea8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+header h1 { margin: 0; font-size: 1.7rem; }
+header p { margin: 4px 0 20px; color: var(--muted); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+input[type="text"], input:not([type]), select {
+  background: var(--card); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px 10px; font: inherit;
+}
+.toolbar input:not([type]) { flex: 1; min-width: 160px; }
+button {
+  background: var(--accent); color: #11180a; border: 0; border-radius: 6px;
+  padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;
+}
+button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button:disabled { opacity: .35; cursor: not-allowed; }
+.check { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: .9rem; }
+
+.error { background: #3a1d19; border: 1px solid var(--bad); padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; }
+
+.layout { display: grid; grid-template-columns: 1fr 280px; gap: 16px; align-items: start; }
+@media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.card h2 { margin: 0 0 12px; font-size: 1.05rem; }
+.hint { color: var(--muted); font-size: .85rem; margin: -6px 0 12px; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.empty { text-align: center; color: var(--muted); padding: 24px; }
+
+.badge { padding: 2px 8px; border-radius: 999px; font-size: .8rem; color: #11180a; font-weight: 600; }
+.badge.mint, .fill.mint { background: var(--mint); }
+.badge.good, .fill.good { background: var(--good); }
+.badge.average, .fill.average { background: var(--average); }
+.badge.bad, .fill.bad { background: var(--bad); }
+.badge.other, .fill.other { background: var(--other); }
+
+.pager { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 14px; }
+.pager .check { margin-left: auto; }
+
+.stat { margin-bottom: 12px; }
+.stat-head { display: flex; justify-content: space-between; font-size: .9rem; margin-bottom: 4px; }
+.bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.fill { height: 100%; border-radius: 4px; transition: width .3s; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+    <script type="text/babel">
+const { useEffect, useState } = React;
+
+const PAGE_SIZES = [10, 20, 50, 100];
+
+async function api(path, params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== "")
+  );
+  const qs = query.toString();
+  let res;
+  try {
+    res = await fetch(`${path}${qs ? `?${qs}` : ""}`);
+  } catch {
+    throw new Error("Не вдалося підключитися до сервера. Запустіть: python api.py items.csv");
+  }
+  if (res.status === 404) return { notFound: true };
+  if (!res.ok) throw new Error(`Помилка сервера (${res.status})`);
+  return res.json();
+}
+
+const conditionClass = (c) => {
+  const key = c.toLowerCase();
+  return ["mint", "good", "average", "bad"].includes(key) ? key : "other";
+};
+
+function App() {
+  const [searchBy, setSearchBy] = useState("name");
+  const [text, setText] = useState("");
+  const [exact, setExact] = useState(false);
+  const [active, setActive] = useState(null);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  const [rows, setRows] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [stats, setStats] = useState({});
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        if (!active) {
+          const d = await api("/items", { page, page_size: pageSize });
+          if (cancelled) return;
+          setRows(d.items);
+          setTotalItems(d.total_items);
+          setTotalPages(d.total_pages);
+        } else {
+          const path = active.by === "id" ? `/items/${active.value}` : "/items/search";
+          const params = active.by === "name" ? { name: active.value, exact: active.exact } : {};
+          const d = await api(path, params);
+          if (cancelled) return;
+          const all = d.notFound ? [] : d;
+          setRows(all.slice((page - 1) * pageSize, page * pageSize));
+          setTotalItems(all.length);
+          setTotalPages(Math.ceil(all.length / pageSize));
+        }
+        setError("");
+      } catch (e) {
+        if (!cancelled) setError(e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [active, page, pageSize]);
+
+  const statsName = active?.by === "name" ? active.value : undefined;
+  useEffect(() => {
+    let cancelled = false;
+    api("/stats/conditions", { name: statsName, exact: statsName ? active.exact : undefined })
+      .then((d) => !cancelled && setStats(d.notFound ? {} : d))
+      .catch(() => !cancelled && setStats({}));
+    return () => { cancelled = true; };
+  }, [statsName, active?.exact]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    const value = text.trim();
+    if (!value) return reset();
+    if (searchBy === "id" && !/^\d+$/.test(value)) {
+      setError("ID має бути цілим числом");
+      return;
+    }
+    setPage(1);
+    setActive({ by: searchBy, value, exact });
+  };
+
+  const reset = () => {
+    setText("");
+    setPage(1);
+    setActive(null);
+  };
+
+  return (
+    <main>
+      <header>
+        <h1>☣ Zomboid Accounting System</h1>
+        <p>Облік предметів першої необхідності для громади виживачів</p>
+      </header>
+
+      <form className="toolbar" onSubmit={submit}>
+        <select value={searchBy} onChange={(e) => setSearchBy(e.target.value)}>
+          <option value="name">Пошук за назвою</option>
+          <option value="id">Пошук за ID</option>
+        </select>
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={searchBy === "id" ? "Наприклад, 2" : "Наприклад, nails"}
+        />
+        {searchBy === "name" && (
+          <label className="check">
+            <input type="checkbox" checked={exact} onChange={(e) => setExact(e.target.checked)} />
+            точний збіг
+          </label>
+        )}
+        <button type="submit">Знайти</button>
+        {active && (
+          <button type="button" className="secondary" onClick={reset}>
+            Скинути
+          </button>
+        )}
+      </form>
+
+      {error && <div className="error">{error}</div>}
+
+      <div className="layout">
+        <section className="card">
+          <h2>
+            {active
+              ? `Результати: «${active.value}» (${totalItems})`
+              : `Усі предмети (${totalItems.toLocaleString("uk-UA")})`}
+          </h2>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Назва</th><th>Тип</th><th>Стан</th><th className="num">Кількість</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((it, i) => (
+                  <tr key={`${it.id}-${it.condition}-${i}`}>
+                    <td>{it.id}</td>
+                    <td>{it.name}</td>
+                    <td>{it.type}</td>
+                    <td><span className={`badge ${conditionClass(it.condition)}`}>{it.condition}</span></td>
+                    <td className="num">{it.amount.toLocaleString("uk-UA")}</td>
+                  </tr>
+                ))}
+                {!loading && rows.length === 0 && !error && (
+                  <tr><td colSpan="5" className="empty">Нічого не знайдено</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="pager">
+            <button disabled={page <= 1} onClick={() => setPage(page - 1)}>← Назад</button>
+            <span>Сторінка {totalPages === 0 ? 0 : page} з {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Далі →</button>
+            <label className="check">
+              На сторінці:
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+              >
+                {PAGE_SIZES.map((n) => <option key={n}>{n}</option>)}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <aside className="card">
+          <h2>Стан предметів</h2>
+          <p className="hint">
+            {statsName ? `Лише «${statsName}»` : "Усі предмети"} · за кількістю
+          </p>
+          {Object.keys(stats).length === 0 && <p className="hint">Немає даних</p>}
+          {Object.entries(stats).map(([cond, share]) => (
+            <div className="stat" key={cond}>
+              <div className="stat-head"><span>{cond}</span><b>{share}%</b></div>
+              <div className="bar"><div className={`fill ${conditionClass(cond)}`} style={{ width: `${share}%` }} /></div>
+            </div>
+          ))}
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+    </script>
+  </body>
+</html>
