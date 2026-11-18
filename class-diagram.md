@@ -1,4 +1,4 @@
-# Діаграма класів
+# Class Diagram
 
 ```mermaid
 classDiagram
@@ -70,14 +70,14 @@ classDiagram
     ZomboidError <|-- InvalidDataError
     ZomboidError <|-- UnsupportedFormatError
 
-    ItemCatalog "1" o-- "*" Item : зберігає
-    Page "1" o-- "*" Item : містить
-    ItemCatalog ..> Page : створює
-    ItemCatalog ..> ReaderRegistry : обирає рідер
-    ItemCatalog ..> ItemReader : читає через
-    ReaderRegistry o-- ItemReader : реєструє
-    ReaderRegistry ..> UnsupportedFormatError : кидає
-    CsvItemReader ..> InvalidDataError : кидає
-    CLI ..> ItemCatalog : використовує
-    CLI ..> ZomboidError : обробляє
+    ItemCatalog "1" o-- "*" Item : stores
+    Page "1" o-- "*" Item : contains
+    ItemCatalog ..> Page : creates
+    ItemCatalog ..> ReaderRegistry : selects reader
+    ItemCatalog ..> ItemReader : reads via
+    ReaderRegistry o-- ItemReader : registers
+    ReaderRegistry ..> UnsupportedFormatError : raises
+    CsvItemReader ..> InvalidDataError : raises
+    CLI ..> ItemCatalog : uses
+    CLI ..> ZomboidError : handles
 ```
